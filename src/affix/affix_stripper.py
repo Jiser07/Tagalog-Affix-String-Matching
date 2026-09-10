@@ -12,7 +12,7 @@ def strip_affix(word):
         return word[0] + word[3:]
 
     # --- Prefixes (handles both hyphenated and non-hyphenated forms) ---
-    for prefix in ["nag", "mag", "pag"]:
+    for prefix in ["nag", "mag", "pag", "maka"]:
         if word.startswith(prefix + "-"):
             return word[len(prefix) + 1:]
         if word.startswith(prefix):
