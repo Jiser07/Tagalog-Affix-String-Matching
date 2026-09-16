@@ -13,7 +13,7 @@ KNOWN_ROOTS = load_known_roots(DATASET_PATH)
 
 def tokenize(text):
     tokens = []
-    for match in re.finditer(r"[A-Za-zÀ-ÿ]+", text):
+    for match in re.finditer(r"[A-Za-zÀ-ÿ]+(?:-[A-Za-zÀ-ÿ]+)?", text):
         tokens.append((match.group(), match.start()))
     return tokens
 
