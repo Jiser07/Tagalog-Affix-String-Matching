@@ -1,33 +1,72 @@
-def strip_affix(word):
-    """
-    Attempts to reduce a Tagalog word to its likely root by stripping
-    common prefixes, infixes, and suffixes. Stops after the first
-    successful strip, since a word normally carries one affix pattern.
-    """
+import csv
+import os
 
-    # --- Infixes: check first, since their position pattern is distinctive ---
-    if len(word) > 3 and word[1:3] == "um":
-        return word[0] + word[3:]
-    if len(word) > 3 and word[1:3] == "in":
-        return word[0] + word[3:]
 
-    # --- Prefixes (handles both hyphenated and non-hyphenated forms) ---
+def load_known_roots(csv_path):
+    """
+    Loads the set of known root words from the dataset CSV, used to help
+    disambiguate ambiguous affix-stripping cases.
+    """
+    known_roots = set()
+    with open(csv_path, encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            known_roots.add(row["root"].strip().lower())
+    return known_roots
+
+
+def strip_affix(word, known_roots=None):
+    """
+    Attempts to reduce a Tagalog word to its likely root.
+
+    If `known_roots` (a set of lowercase root words) is provided, the function
+    generates every plausible candidate root using the supported affix rules,
+    then prefers whichever candidate is an actual known root. This resolves
+    cases where a simple heuristic alone would guess wrong (e.g., a word that
+    coincidentally contains "in" at the position the -in- infix would occupy,
+    but is not actually using that infix).
+
+    If no `known_roots` is given, or none of the candidates match a known
+    root, the function falls back to a fixed priority order: infix, then
+    prefix, then suffix.
+    """
+    word = word.lower()
+    candidates = []
+
+    # --- Infix candidates ---
+    # Standard case: infix inserted after the first consonant (position 1)
+    if len(word) > 3 and word[1:3] in ("um", "in"):
+        candidates.append(word[0] + word[3:])
+    # Consonant-cluster case: infix inserted after a 2-letter initial cluster
+    # (e.g. "ng") at position 2
+    if len(word) > 4 and word[2:4] in ("um", "in"):
+        candidates.append(word[0:2] + word[4:])
+
+    # --- Prefix candidates ---
     for prefix in ["nag", "mag", "pag", "maka"]:
         if word.startswith(prefix + "-"):
-            return word[len(prefix) + 1:]
-        if word.startswith(prefix):
-            return word[len(prefix):]
+            candidates.append(word[len(prefix) + 1:])
+        elif word.startswith(prefix):
+            candidates.append(word[len(prefix):])
 
-    # --- Suffixes ---
+    # --- Suffix candidates ---
     for suffix in ["in", "an"]:
         if word.endswith(suffix) and len(word) - len(suffix) >= 2:
             stripped = word[:-len(suffix)]
-            # Linking consonant rule: e.g. "basa" + "-in" -> "basahin"
             if stripped.endswith("h") and len(stripped) > 1 and stripped[-2] in "aeiou":
                 stripped = stripped[:-1]
-            return stripped
+            candidates.append(stripped)
 
-    # No known affix pattern matched — assume it's already a root
+    # Prefer a candidate that is a known root, if we have a reference list
+    if known_roots:
+        for c in candidates:
+            if c in known_roots:
+                return c
+
+    # Fallback: no dictionary match (or no dictionary given at all)
+    if candidates:
+        return candidates[0]
+
     return word
 
 
@@ -41,6 +80,7 @@ if __name__ == "__main__":
         ("mag-aral", "aral"),
         ("sumulat", "sulat"),
         ("basahin", "basa"),
+        ("makakain", "kain"),
     ]
 
     for word, expected_root in test_cases:
