@@ -17,8 +17,12 @@ DATASET_PATH = os.path.join(os.path.dirname(__file__), "..", "dataset", "root_wo
 
 
 def load_dataset(csv_path):
-    with open(csv_path, encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+    try:
+        with open(csv_path, encoding="utf-8") as f:
+            return list(csv.DictReader(f))
+    except FileNotFoundError:
+        print(f"Error: dataset file not found at '{csv_path}'. Cannot run evaluation.")
+        return []
 
 
 def evaluate_recall(rows, known_roots):

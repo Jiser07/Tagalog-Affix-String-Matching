@@ -3,15 +3,15 @@ import os
 
 
 def load_known_roots(csv_path):
-    """
-    Loads the set of known root words from the dataset CSV, used to help
-    disambiguate ambiguous affix-stripping cases.
-    """
     known_roots = set()
-    with open(csv_path, encoding="utf-8") as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            known_roots.add(row["root"].strip().lower())
+    try:
+        with open(csv_path, encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                known_roots.add(row["root"].strip().lower())
+    except FileNotFoundError:
+        print(f"Error: dataset file not found at '{csv_path}'. "
+              f"Affix stripping will proceed without dictionary validation.")
     return known_roots
 
 

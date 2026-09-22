@@ -34,7 +34,9 @@ def run_comparison(pattern, text):
 if __name__ == "__main__":
     sample_text = (
         "Masarap ang pagkain sa handaan. Gusto kong kumain, ngunit kinain na ni "
-        "Maria ang natitirang kanin bago pa ako makakain."
+        "Maria ang natitirang kanin bago pa ako makakain. Kailangan kong linisin "
+        "ang bahay bago ako matulog. Gusto kong pintahan ang bagong upuan. "
+        "Palagi siyang ngumiti tuwing may bisita."
     )
 
     print("=== Tagalog Affix-Aware String Matching — Demo ===")
