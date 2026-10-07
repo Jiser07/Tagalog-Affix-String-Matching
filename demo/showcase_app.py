@@ -4,12 +4,13 @@ Showcase demo - a separate, presentation-only app.
 This is NOT part of the project's core deliverable (that's demo/run_demo.py).
 This file exists purely to demonstrate library catalog searching using 
 root-aware affix matching, along with real-world application features 
-like typo correction and synonym expansion based on expert feedback.
+like dynamic fuzzy typo correction and synonym expansion.
 """
 
 import sys
 import os
 import time
+import difflib  
 import tkinter as tk
 from tkinter import ttk
 from tkinter import messagebox
@@ -26,21 +27,15 @@ from affix_aware import tokenize, affix_aware_search
 DATASET_PATH = os.path.join(os.path.dirname(__file__), "..", "dataset", "root_words.csv")
 KNOWN_ROOTS = load_known_roots(DATASET_PATH)
 
-# --- Real-World Application Dictionaries (Proof of Concept) ---
-TYPO_DICTIONARY = {
-    "kaen": "kain",
-    "kaain": "kain",
-    "ponta": "punta",
-    "solat": "sulat",
-    "lenes": "linis",
-    "bele": "bili"
-}
-
+# --- Expanded Synonym Dictionary ---
 SYNONYM_DICTIONARY = {
-    "kain": ["lamon"],
+    "kain": ["lamon", "tsibog"],
     "lamon": ["kain"],
-    "aral": ["basa"],
-    "basa": ["aral"]
+    "aral": ["basa", "review"],
+    "basa": ["aral"],
+    "sulat": ["liham"],
+    "linis": ["hugas", "punas"],
+    "bili": ["gastos"]
 }
 
 # --- Default library catalog ---
@@ -80,8 +75,8 @@ class LibrarySearchApp(ttk.Frame):
         ).pack(anchor="w")
         ttk.Label(
             self,
-            text="Search a root word to retrieve inflected variations. Includes a proof-of-concept "
-                 "typo corrector and synonym expander for select words.",
+            text="Search a root word to retrieve inflected variations. Includes a dynamic fuzzy "
+                 "typo corrector and synonym expander.",
             wraplength=680, foreground="#444"
         ).pack(anchor="w", pady=(2, 10))
 
@@ -141,15 +136,23 @@ class LibrarySearchApp(ttk.Frame):
         self.add_entry.delete(0, "end")
 
     def get_search_terms(self, raw_word):
-        # 1. Check for typos
-        corrected_word = TYPO_DICTIONARY.get(raw_word, raw_word)
+        corrected_word = raw_word
+        fuzzy_used = False
+
+        # 1. Dynamic Fuzzy Typo Checking
+        # If the word isn't a known root, check if it's very close to one (75% similarity)
+        if raw_word not in KNOWN_ROOTS and KNOWN_ROOTS:
+            closest_matches = difflib.get_close_matches(raw_word, KNOWN_ROOTS, n=1, cutoff=0.75)
+            if closest_matches:
+                corrected_word = closest_matches[0]
+                fuzzy_used = True
         
         # 2. Check for synonyms
         search_terms = [corrected_word]
         if corrected_word in SYNONYM_DICTIONARY:
             search_terms.extend(SYNONYM_DICTIONARY[corrected_word])
             
-        return corrected_word, search_terms
+        return corrected_word, search_terms, fuzzy_used
 
     def run_search(self):
         raw_word = self.entry.get().strip().lower()
@@ -162,12 +165,12 @@ class LibrarySearchApp(ttk.Frame):
             self.smart_feedback_label.config(text="")
             return
 
-        corrected_word, search_terms = self.get_search_terms(raw_word)
+        corrected_word, search_terms, fuzzy_used = self.get_search_terms(raw_word)
 
         # Update UI feedback for typos and synonyms
         feedback = []
-        if corrected_word != raw_word:
-            feedback.append(f"Typo corrected: '{raw_word}' ➔ '{corrected_word}'")
+        if fuzzy_used:
+            feedback.append(f"Fuzzy typo fixed: '{raw_word}' ➔ '{corrected_word}'")
         if len(search_terms) > 1:
             synonyms = ", ".join(search_terms[1:])
             feedback.append(f"Synonyms included: {synonyms}")
@@ -220,7 +223,7 @@ class LibrarySearchApp(ttk.Frame):
             messagebox.showinfo("Notice", "Please enter a root word to measure performance.")
             return
 
-        corrected_word, search_terms = self.get_search_terms(raw_word)
+        corrected_word, search_terms, _ = self.get_search_terms(raw_word)
         corpus = " ".join(self.books).lower()
         repeats = 1000
 
