@@ -1,9 +1,10 @@
 """
-Showcase demo — a separate, presentation-only app.
+Showcase demo - a separate, presentation-only app.
 
 This is NOT part of the project's core deliverable (that's demo/run_demo.py).
 This file exists purely to demonstrate library catalog searching using 
-root-aware affix matching versus plain substring matching.
+root-aware affix matching, along with real-world application features 
+like typo correction and synonym expansion based on expert feedback.
 """
 
 import sys
@@ -25,11 +26,29 @@ from affix_aware import tokenize, affix_aware_search
 DATASET_PATH = os.path.join(os.path.dirname(__file__), "..", "dataset", "root_words.csv")
 KNOWN_ROOTS = load_known_roots(DATASET_PATH)
 
+# --- Real-World Application Dictionaries (Proof of Concept) ---
+TYPO_DICTIONARY = {
+    "kaen": "kain",
+    "kaain": "kain",
+    "ponta": "punta",
+    "solat": "sulat",
+    "lenes": "linis",
+    "bele": "bili"
+}
+
+SYNONYM_DICTIONARY = {
+    "kain": ["lamon"],
+    "lamon": ["kain"],
+    "aral": ["basa"],
+    "basa": ["aral"]
+}
+
 # --- Default library catalog ---
 DEFAULT_BOOKS = [
     "Ang Masustansyang Pagkain para sa Pamilya",
     "Sino ang Kumain ng Huling Pandesal?",
     "Ang Lihim na Kinain ng Halimaw sa Gubat",
+    "Ang Halimaw na Lumamon ng Buong Bayan", 
     "Mga Pangarap ng Batang Gustong Makakain Araw-araw",
     "Paano Mag-aral ng Kasaysayan",
     "Ang Guro na Palaging Nag-aral ng Bago",
@@ -56,13 +75,13 @@ class LibrarySearchApp(ttk.Frame):
         self.books = list(DEFAULT_BOOKS)
 
         ttk.Label(
-            self, text="Library Catalog Search — Plain vs. Affix-Aware Matching",
+            self, text="Library Catalog Search - Affix, Typo, and Synonym Aware",
             font=("Segoe UI", 13, "bold")
         ).pack(anchor="w")
         ttk.Label(
             self,
-            text="Search a root word to see which book titles in the catalog match — "
-                 "demonstrating how root-aware search retrieves inflected variations.",
+            text="Search a root word to retrieve inflected variations. Includes a proof-of-concept "
+                 "typo corrector and synonym expander for select words.",
             wraplength=680, foreground="#444"
         ).pack(anchor="w", pady=(2, 10))
 
@@ -74,6 +93,10 @@ class LibrarySearchApp(ttk.Frame):
         
         ttk.Button(search_row, text="Search", command=self.run_search).pack(side="left", padx=8)
         ttk.Button(search_row, text="⏱️ Compare Performance", command=self.show_performance).pack(side="left")
+
+        # Feedback label for typos and synonyms
+        self.smart_feedback_label = ttk.Label(self, text="", font=("Segoe UI", 9, "bold"), foreground="#1565C0")
+        self.smart_feedback_label.pack(anchor="w", pady=(0, 5))
 
         self.listbox = tk.Listbox(
             self, font=("Segoe UI", 11), height=14,
@@ -117,25 +140,58 @@ class LibrarySearchApp(ttk.Frame):
         self.listbox.itemconfig("end", {"bg": "white", "fg": "black"})
         self.add_entry.delete(0, "end")
 
+    def get_search_terms(self, raw_word):
+        # 1. Check for typos
+        corrected_word = TYPO_DICTIONARY.get(raw_word, raw_word)
+        
+        # 2. Check for synonyms
+        search_terms = [corrected_word]
+        if corrected_word in SYNONYM_DICTIONARY:
+            search_terms.extend(SYNONYM_DICTIONARY[corrected_word])
+            
+        return corrected_word, search_terms
+
     def run_search(self):
-        word = self.entry.get().strip().lower()
+        raw_word = self.entry.get().strip().lower()
 
         for i in range(len(self.books)):
             self.listbox.itemconfig(i, {"bg": "white", "fg": "black"})
 
-        if not word:
+        if not raw_word:
             self.status_label.config(text="")
+            self.smart_feedback_label.config(text="")
             return
+
+        corrected_word, search_terms = self.get_search_terms(raw_word)
+
+        # Update UI feedback for typos and synonyms
+        feedback = []
+        if corrected_word != raw_word:
+            feedback.append(f"Typo corrected: '{raw_word}' ➔ '{corrected_word}'")
+        if len(search_terms) > 1:
+            synonyms = ", ".join(search_terms[1:])
+            feedback.append(f"Synonyms included: {synonyms}")
+            
+        if feedback:
+            self.smart_feedback_label.config(text=" | ".join(feedback))
+        else:
+            self.smart_feedback_label.config(text="")
 
         both_count = 0
         affix_only_count = 0
         plain_only_count = 0
-        no_match_count = 0
 
         for i, title in enumerate(self.books):
-            plain_hit = bool(naive_search(word, title.lower()))
-            affix_hits = [w for w, _ in tokenize(title) if strip_affix(w.lower(), KNOWN_ROOTS) == word]
-            affix_hit = bool(affix_hits)
+            plain_hit = False
+            affix_hit = False
+            
+            for term in search_terms:
+                if naive_search(term, title.lower()):
+                    plain_hit = True
+                
+                hits = [w for w, _ in tokenize(title) if strip_affix(w.lower(), KNOWN_ROOTS) == term]
+                if hits:
+                    affix_hit = True
 
             if plain_hit and affix_hit:
                 self.listbox.itemconfig(i, {"bg": "#FFE58A"})
@@ -146,8 +202,6 @@ class LibrarySearchApp(ttk.Frame):
             elif plain_hit:
                 self.listbox.itemconfig(i, {"bg": "#F4A3A3"})
                 plain_only_count += 1
-            else:
-                no_match_count += 1
 
         total_affix = both_count + affix_only_count
         total_plain = both_count + plain_only_count
@@ -156,33 +210,47 @@ class LibrarySearchApp(ttk.Frame):
         self.status_label.config(
             text=(
                 f"Plain matching found {total_plain} book(s)  |  "
-                f"Affix-aware matching found {total_affix} book(s)  {diff_text}  "
+                f"Affix-aware matching found {total_affix} book(s)  {diff_text}"
             )
         )
 
     def show_performance(self):
-        word = self.entry.get().strip().lower()
-        if not word:
+        raw_word = self.entry.get().strip().lower()
+        if not raw_word:
             messagebox.showinfo("Notice", "Please enter a root word to measure performance.")
             return
 
+        corrected_word, search_terms = self.get_search_terms(raw_word)
         corpus = " ".join(self.books).lower()
         repeats = 1000
 
-        def time_algorithm(func, *args):
+        def time_plain_algorithm(func, terms, text):
             start = time.perf_counter()
             for _ in range(repeats):
-                func(*args)
+                for term in terms:
+                    func(term, text)
             end = time.perf_counter()
             return (end - start) * 1000 / repeats
 
-        time_naive = time_algorithm(naive_search, word, corpus)
-        time_kmp = time_algorithm(kmp_search, word, corpus)
-        time_bm = time_algorithm(boyer_moore_search, word, corpus)
-        time_affix = time_algorithm(affix_aware_search, word, corpus)
+        def time_affix_algorithm(terms, text):
+            start = time.perf_counter()
+            for _ in range(repeats):
+                for term in terms:
+                    affix_aware_search(term, text)
+            end = time.perf_counter()
+            return (end - start) * 1000 / repeats
+
+        time_naive = time_plain_algorithm(naive_search, search_terms, corpus)
+        time_kmp = time_plain_algorithm(kmp_search, search_terms, corpus)
+        time_bm = time_plain_algorithm(boyer_moore_search, search_terms, corpus)
+        time_affix = time_affix_algorithm(search_terms, corpus)
         
-        plain_matches = naive_search(word, corpus)
-        affix_matches = affix_aware_search(word, corpus)
+        # Get actual match counts
+        plain_matches = []
+        affix_matches = []
+        for term in search_terms:
+            plain_matches.extend(naive_search(term, corpus))
+            affix_matches.extend(affix_aware_search(term, corpus))
         
         diff_matches = len(affix_matches) - len(plain_matches)
         fastest_baseline = min(time_naive, time_kmp, time_bm)
@@ -193,7 +261,7 @@ class LibrarySearchApp(ttk.Frame):
         popup.geometry("450x380")
         popup.grab_set()
 
-        ttk.Label(popup, text=f"Performance Results for '{word}'", font=("Segoe UI", 12, "bold")).pack(pady=(15, 5))
+        ttk.Label(popup, text=f"Performance Results for '{raw_word}'", font=("Segoe UI", 12, "bold")).pack(pady=(15, 5))
         ttk.Label(popup, text=f"Averaged over {repeats:,} runs across the catalog corpus.", font=("Segoe UI", 9, "italic")).pack(pady=(0, 15))
 
         frame_base = ttk.LabelFrame(popup, text=" Baseline Matching (Plain Substring) ", padding=10)
@@ -227,7 +295,7 @@ class LibrarySearchApp(ttk.Frame):
 # ---------------------------------------------------------------------------
 def main():
     root = tk.Tk()
-    root.title("Affix-Aware Tagalog Matching — Showcase Demo")
+    root.title("Affix-Aware Tagalog Matching - Showcase Demo")
     root.geometry("780x560")
 
     style = ttk.Style()
@@ -239,7 +307,7 @@ def main():
     header = ttk.Frame(root, padding=(15, 12))
     header.pack(fill="x")
     ttk.Label(
-        header, text="Affix-Aware String Matching — Showcase Demo",
+        header, text="Affix-Aware String Matching - Showcase Demo",
         font=("Segoe UI", 15, "bold")
     ).pack(anchor="w")
     ttk.Label(
@@ -252,7 +320,6 @@ def main():
     app_frame.pack(fill="both", expand=True, padx=10, pady=10)
 
     root.mainloop()
-
 
 if __name__ == "__main__":
     main()
