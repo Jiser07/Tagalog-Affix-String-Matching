@@ -23,7 +23,11 @@ from affix_stripper import strip_affix, load_known_roots
 from affix_aware import tokenize, affix_aware_search
 
 DATASET_PATH = os.path.join(os.path.dirname(__file__), "..", "dataset", "root_words.csv")
+EXTENDED_DATASET_PATH = os.path.join(os.path.dirname(__file__), "..", "dataset", "extended_dataset_experimental.csv")
+
 KNOWN_ROOTS = load_known_roots(DATASET_PATH)
+if os.path.exists(EXTENDED_DATASET_PATH):
+    KNOWN_ROOTS.update(load_known_roots(EXTENDED_DATASET_PATH))
 
 # --- Synonym Dictionary ---
 SYNONYM_DICTIONARY = {
@@ -41,7 +45,7 @@ DEFAULT_BOOKS = [
     "Ang Masustansyang Pagkain para sa Pamilya",
     "Sino ang Kumain ng Huling Pandesal?",
     "Ang Lihim na Kinain ng Halimaw sa Gubat",
-    "Ang Halimaw na Lumamon ng Buong Bayan", 
+    "Ang Halimaw na Lumamon ng Buong Bayan",
     "Mga Pangarap ng Batang Gustong Makakain Araw-araw",
     "Paano Mag-aral ng Kasaysayan",
     "Ang Guro na Palaging Nag-aral ng Bago",
@@ -58,6 +62,7 @@ DEFAULT_BOOKS = [
     "Saan Bumili ng Murang Sapatos?",
     "Ang Regalong Binili ni Nanay"
 ]
+
 
 # ---------------------------------------------------------------------------
 # Main Application Window (Single-Tab Library Search & Performance)
@@ -83,7 +88,7 @@ class LibrarySearchApp(ttk.Frame):
         self.entry = ttk.Entry(search_row, width=25, font=("Segoe UI", 11))
         self.entry.pack(side="left")
         self.entry.bind("<Return>", lambda e: self.run_search())
-        
+
         ttk.Button(search_row, text="Search", command=self.run_search).pack(side="left", padx=8)
         ttk.Button(search_row, text="⏱️ Compare Performance", command=self.show_performance).pack(side="left")
 
@@ -137,11 +142,11 @@ class LibrarySearchApp(ttk.Frame):
         # Bidirectional query stemming: strip query to its root first
         derived_root = strip_affix(raw_word, KNOWN_ROOTS)
         search_terms = [derived_root]
-        
+
         # Include synonyms of the derived root
         if derived_root in SYNONYM_DICTIONARY:
             search_terms.extend(SYNONYM_DICTIONARY[derived_root])
-            
+
         return derived_root, search_terms
 
     def run_search(self):
@@ -164,7 +169,7 @@ class LibrarySearchApp(ttk.Frame):
         if len(search_terms) > 1:
             synonyms = ", ".join(search_terms[1:])
             feedback.append(f"Synonyms included: {synonyms}")
-            
+
         if feedback:
             self.smart_feedback_label.config(text=" | ".join(feedback))
         else:
@@ -228,7 +233,7 @@ class LibrarySearchApp(ttk.Frame):
             start = time.perf_counter()
             for _ in range(repeats):
                 for term in terms:
-                    affix_aware_search(term, text)
+                    affix_aware_search(term, text, known_roots=KNOWN_ROOTS)
             end = time.perf_counter()
             return (end - start) * 1000 / repeats
 
@@ -236,15 +241,15 @@ class LibrarySearchApp(ttk.Frame):
         time_naive = time_plain_algorithm(naive_search, raw_word, corpus)
         time_kmp = time_plain_algorithm(kmp_search, raw_word, corpus)
         time_bm = time_plain_algorithm(boyer_moore_search, raw_word, corpus)
-        
+
         # Affix search benchmarks the derived root and its synonyms
         time_affix = time_affix_algorithm(search_terms, corpus)
-        
+
         plain_matches = naive_search(raw_word, corpus)
         affix_matches = []
         for term in search_terms:
-            affix_matches.extend(affix_aware_search(term, corpus))
-        
+            affix_matches.extend(affix_aware_search(term, corpus, known_roots=KNOWN_ROOTS))
+
         diff_matches = len(affix_matches) - len(plain_matches)
         fastest_baseline = min(time_naive, time_kmp, time_bm)
         overhead = time_affix - fastest_baseline
@@ -261,17 +266,17 @@ class LibrarySearchApp(ttk.Frame):
 
         frame_base = ttk.LabelFrame(popup, text=" Baseline Matching (Plain Substring) ", padding=10)
         frame_base.pack(fill="x", padx=20, pady=5)
-        
+
         ttk.Label(frame_base, text=f"Naive Search:\t\t{time_naive:.4f} ms").pack(anchor="w")
         ttk.Label(frame_base, text=f"Knuth-Morris-Pratt:\t{time_kmp:.4f} ms").pack(anchor="w")
         ttk.Label(frame_base, text=f"Boyer-Moore:\t\t{time_bm:.4f} ms").pack(anchor="w")
-        ttk.Label(frame_base, text=f"Matches Found: {len(plain_matches)}", foreground="#D32F2F", font=("Segoe UI", 9, "bold")).pack(anchor="w", pady=(5,0))
+        ttk.Label(frame_base, text=f"Matches Found: {len(plain_matches)}", foreground="#D32F2F", font=("Segoe UI", 9, "bold")).pack(anchor="w", pady=(5, 0))
 
         frame_affix = ttk.LabelFrame(popup, text=" Affix-Aware Matching (Root Extraction) ", padding=10)
         frame_affix.pack(fill="x", padx=20, pady=10)
 
         ttk.Label(frame_affix, text=f"Affix-Aware Execution:\t{time_affix:.4f} ms").pack(anchor="w")
-        ttk.Label(frame_affix, text=f"Matches Found: {len(affix_matches)}", foreground="#2E7D32", font=("Segoe UI", 9, "bold")).pack(anchor="w", pady=(5,0))
+        ttk.Label(frame_affix, text=f"Matches Found: {len(affix_matches)}", foreground="#2E7D32", font=("Segoe UI", 9, "bold")).pack(anchor="w", pady=(5, 0))
 
         if diff_matches >= 0:
             diff_text = f"retrieved {diff_matches} MORE matches"
@@ -284,8 +289,9 @@ class LibrarySearchApp(ttk.Frame):
             f"with a processing overhead of {overhead:.4f} ms per run compared to the fastest baseline algorithm."
         )
         ttk.Label(popup, text=conclusion_text, wraplength=400, justify="center", font=("Segoe UI", 10, "bold"), foreground="#1565C0").pack(pady=15, padx=20)
-        
+
         ttk.Button(popup, text="Close", command=popup.destroy).pack()
+
 
 # ---------------------------------------------------------------------------
 def main():
@@ -315,6 +321,7 @@ def main():
     app_frame.pack(fill="both", expand=True, padx=10, pady=10)
 
     root.mainloop()
+
 
 if __name__ == "__main__":
     main()

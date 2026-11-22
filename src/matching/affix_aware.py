@@ -26,7 +26,7 @@ def tokenize(text):
     return tokens
 
 
-def affix_aware_search(root_pattern, text, algorithm=naive_search):
+def affix_aware_search(root_pattern, text, algorithm=naive_search, known_roots=None):
     """
     Affix-aware matching:
     1. Normalizes the search query to its root form (bidirectional / query stemming).
@@ -36,13 +36,14 @@ def affix_aware_search(root_pattern, text, algorithm=naive_search):
     
     Returns a list of (position, original_word) tuples.
     """
+    roots = known_roots if known_roots is not None else KNOWN_ROOTS
     matches = []
     
     # Normalize the query to its root if the user typed an inflected form (e.g. "kumain" -> "kain")
-    pattern = strip_affix(root_pattern.lower(), KNOWN_ROOTS)
+    pattern = strip_affix(root_pattern.lower(), roots)
 
     for word, position in tokenize(text):
-        root = strip_affix(word.lower(), KNOWN_ROOTS)
+        root = strip_affix(word.lower(), roots)
         
         # Run the pattern through the selected string matching algorithm
         if len(root) == len(pattern) and algorithm(pattern, root):
