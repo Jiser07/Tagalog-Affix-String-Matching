@@ -3,7 +3,7 @@ Showcase demo - a separate, presentation-only app.
 
 This is NOT part of the project's core deliverable (that's demo/run_demo.py).
 This file exists purely to demonstrate library catalog searching using 
-root-aware affix matching, along with synonym expansion for real-world demonstration.
+root-aware affix matching, bidirectional query stemming, and synonym expansion.
 """
 
 import sys
@@ -68,13 +68,13 @@ class LibrarySearchApp(ttk.Frame):
         self.books = list(DEFAULT_BOOKS)
 
         ttk.Label(
-            self, text="Library Catalog Search - Affix and Synonym Aware",
+            self, text="Library Catalog Search - Affix, Bidirectional, and Synonym Aware",
             font=("Segoe UI", 13, "bold")
         ).pack(anchor="w")
         ttk.Label(
             self,
-            text="Search a root word to retrieve inflected variations. Includes a proof-of-concept "
-                 "synonym expander for related vocabulary.",
+            text="Search any Tagalog word (root or inflected form). The system automatically "
+                 "normalizes the query to its root and retrieves related book titles.",
             wraplength=680, foreground="#444"
         ).pack(anchor="w", pady=(2, 10))
 
@@ -87,7 +87,7 @@ class LibrarySearchApp(ttk.Frame):
         ttk.Button(search_row, text="Search", command=self.run_search).pack(side="left", padx=8)
         ttk.Button(search_row, text="⏱️ Compare Performance", command=self.show_performance).pack(side="left")
 
-        # Feedback label for synonyms
+        # Feedback label for bidirectional normalization and synonyms
         self.smart_feedback_label = ttk.Label(self, text="", font=("Segoe UI", 9, "bold"), foreground="#1565C0")
         self.smart_feedback_label.pack(anchor="w", pady=(0, 5))
 
@@ -134,10 +134,15 @@ class LibrarySearchApp(ttk.Frame):
         self.add_entry.delete(0, "end")
 
     def get_search_terms(self, raw_word):
-        search_terms = [raw_word]
-        if raw_word in SYNONYM_DICTIONARY:
-            search_terms.extend(SYNONYM_DICTIONARY[raw_word])
-        return search_terms
+        # Bidirectional query stemming: strip query to its root first
+        derived_root = strip_affix(raw_word, KNOWN_ROOTS)
+        search_terms = [derived_root]
+        
+        # Include synonyms of the derived root
+        if derived_root in SYNONYM_DICTIONARY:
+            search_terms.extend(SYNONYM_DICTIONARY[derived_root])
+            
+        return derived_root, search_terms
 
     def run_search(self):
         raw_word = self.entry.get().strip().lower()
@@ -150,11 +155,18 @@ class LibrarySearchApp(ttk.Frame):
             self.smart_feedback_label.config(text="")
             return
 
-        search_terms = self.get_search_terms(raw_word)
+        derived_root, search_terms = self.get_search_terms(raw_word)
 
+        # Update UI feedback
+        feedback = []
+        if derived_root != raw_word:
+            feedback.append(f"Query normalized: '{raw_word}' ➔ root '{derived_root}'")
         if len(search_terms) > 1:
             synonyms = ", ".join(search_terms[1:])
-            self.smart_feedback_label.config(text=f"Synonyms included: {synonyms}")
+            feedback.append(f"Synonyms included: {synonyms}")
+            
+        if feedback:
+            self.smart_feedback_label.config(text=" | ".join(feedback))
         else:
             self.smart_feedback_label.config(text="")
 
@@ -163,10 +175,10 @@ class LibrarySearchApp(ttk.Frame):
         plain_only_count = 0
 
         for i, title in enumerate(self.books):
-            # Plain matching searches strictly the exact letters typed
+            # Plain matching searches strictly the exact literal string typed
             plain_hit = bool(naive_search(raw_word, title.lower()))
 
-            # Affix-aware matching searches the root and its synonyms
+            # Affix-aware matching searches the normalized root and synonyms
             affix_hit = False
             for term in search_terms:
                 hits = [w for w, _ in tokenize(title) if strip_affix(w.lower(), KNOWN_ROOTS) == term]
@@ -198,10 +210,10 @@ class LibrarySearchApp(ttk.Frame):
     def show_performance(self):
         raw_word = self.entry.get().strip().lower()
         if not raw_word:
-            messagebox.showinfo("Notice", "Please enter a root word to measure performance.")
+            messagebox.showinfo("Notice", "Please enter a word to measure performance.")
             return
 
-        search_terms = self.get_search_terms(raw_word)
+        derived_root, search_terms = self.get_search_terms(raw_word)
         corpus = " ".join(self.books).lower()
         repeats = 1000
 
@@ -225,7 +237,7 @@ class LibrarySearchApp(ttk.Frame):
         time_kmp = time_plain_algorithm(kmp_search, raw_word, corpus)
         time_bm = time_plain_algorithm(boyer_moore_search, raw_word, corpus)
         
-        # Affix search benchmarks the root and its synonyms
+        # Affix search benchmarks the derived root and its synonyms
         time_affix = time_affix_algorithm(search_terms, corpus)
         
         plain_matches = naive_search(raw_word, corpus)
@@ -243,6 +255,8 @@ class LibrarySearchApp(ttk.Frame):
         popup.grab_set()
 
         ttk.Label(popup, text=f"Performance Results for '{raw_word}'", font=("Segoe UI", 12, "bold")).pack(pady=(15, 5))
+        if derived_root != raw_word:
+            ttk.Label(popup, text=f"(Derived root: '{derived_root}')", font=("Segoe UI", 9, "bold"), foreground="#1565C0").pack(pady=(0, 5))
         ttk.Label(popup, text=f"Averaged over {repeats:,} runs across the catalog corpus.", font=("Segoe UI", 9, "italic")).pack(pady=(0, 15))
 
         frame_base = ttk.LabelFrame(popup, text=" Baseline Matching (Plain Substring) ", padding=10)

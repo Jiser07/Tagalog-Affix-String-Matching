@@ -28,47 +28,46 @@ def tokenize(text):
 
 def affix_aware_search(root_pattern, text, algorithm=naive_search):
     """
-    Affix-aware matching: strips affixes from every word in the text,
-    then uses the chosen string matching algorithm (Naive, KMP, or Boyer-Moore)
-    to verify whether the stripped root matches the search pattern.
+    Affix-aware matching:
+    1. Normalizes the search query to its root form (bidirectional / query stemming).
+    2. Strips affixes from every word in the text.
+    3. Uses the chosen string matching algorithm (Naive, KMP, or Boyer-Moore)
+       to verify if the stripped root matches the derived query root.
     
     Returns a list of (position, original_word) tuples.
     """
     matches = []
-    pattern = root_pattern.lower()
+    
+    # Normalize the query to its root if the user typed an inflected form (e.g. "kumain" -> "kain")
+    pattern = strip_affix(root_pattern.lower(), KNOWN_ROOTS)
 
     for word, position in tokenize(text):
         root = strip_affix(word.lower(), KNOWN_ROOTS)
         
         # Run the pattern through the selected string matching algorithm
-        # A non-empty match index list of identical length confirms a valid root match
         if len(root) == len(pattern) and algorithm(pattern, root):
             matches.append((position, word))
 
     return matches
 
 
-# Quick manual test: compares all three algorithms running inside affix-aware search
+# Quick manual test
 if __name__ == "__main__":
     sample_text = (
         "Masarap ang pagkain sa handaan. Gusto kong kumain, ngunit "
         "kinain na ni Maria ang natitirang kanin bago pa ako makakain."
     )
-    pattern = "kain"
+    
+    # Test with an inflected query word instead of a bare root
+    query = "kumain"
 
-    print("=== Plain string matching (Baseline Naive) ===")
-    plain_result = naive_search(pattern, sample_text.lower())
-    print(f"Found at character indices: {plain_result}\n")
+    print(f"Searching with inflected query: '{query}'")
+    print("=" * 50)
+    
+    plain_result = naive_search(query, sample_text.lower())
+    print(f"Plain matching finds literal '{query}' at index: {plain_result}")
 
-    print("=== Affix-Aware Matching (Default: Naive) ===")
-    naive_affix = affix_aware_search(pattern, sample_text, algorithm=naive_search)
-    for pos, w in naive_affix:
+    affix_result = affix_aware_search(query, sample_text)
+    print(f"\nAffix-aware matching derives root and finds {len(affix_result)} related forms:")
+    for pos, w in affix_result:
         print(f"  Found '{w}' at position {pos}")
-
-    print("\n=== Affix-Aware Matching (Using KMP) ===")
-    kmp_affix = affix_aware_search(pattern, sample_text, algorithm=kmp_search)
-    print(f"Total matches found via KMP: {len(kmp_affix)}")
-
-    print("\n=== Affix-Aware Matching (Using Boyer-Moore) ===")
-    bm_affix = affix_aware_search(pattern, sample_text, algorithm=boyer_moore_search)
-    print(f"Total matches found via Boyer-Moore: {len(bm_affix)}")
