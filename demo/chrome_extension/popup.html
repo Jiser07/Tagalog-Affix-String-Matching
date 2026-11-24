@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { font-family: "Segoe UI", sans-serif; width: 320px; padding: 12px; margin: 0; color: #222; }
+    h3 { margin: 0 0 4px 0; font-size: 14px; }
+    .sub { font-size: 11px; color: #666; margin-bottom: 10px; }
+    .row { display: flex; gap: 6px; margin-bottom: 8px; }
+    input[type="text"] { flex: 1; padding: 6px 8px; font-size: 13px; border: 1px solid #ccc; border-radius: 4px; }
+    select { width: 100%; padding: 5px; font-size: 12px; margin-bottom: 8px; border: 1px solid #ccc; border-radius: 4px; }
+    button { padding: 6px 10px; font-size: 12px; cursor: pointer; border: none; border-radius: 4px; background: #1565C0; color: white; font-weight: 600; }
+    button.secondary { background: #e0e0e0; color: #222; }
+    #norm { font-size: 11px; color: #1565C0; font-weight: bold; margin-bottom: 6px; min-height: 14px; }
+    #status { font-size: 12px; background: #f5f5f5; padding: 8px; border-radius: 4px; margin-bottom: 8px; display: none; }
+    #error { font-size: 11px; color: #c62828; margin-bottom: 8px; display: none; }
+    .legend { font-size: 11px; border-top: 1px solid #eee; padding-top: 8px; }
+    .leg-item { display: flex; align-items: center; gap: 6px; margin-bottom: 3px; }
+    .swatch { width: 12px; height: 12px; border-radius: 2px; border: 1px solid #ccc; }
+  </style>
+</head>
+<body>
+  <h3>Tagalog Affix-Aware Search</h3>
+  <div class="sub">Runs your Python engine directly on this live webpage.</div>
+
+  <div class="row">
+    <input type="text" id="query" placeholder="Enter Tagalog word (e.g. kain)..." autofocus>
+    <button id="searchBtn">Search</button>
+  </div>
+
+  <select id="algo">
+    <option value="naive">Algorithm: Naive String Matching</option>
+    <option value="kmp">Algorithm: Knuth-Morris-Pratt (KMP)</option>
+    <option value="boyer_moore">Algorithm: Boyer-Moore</option>
+  </select>
+
+  <div class="row">
+    <button id="nextBtn" class="secondary" style="flex:1;">Next Match</button>
+    <button id="clearBtn" class="secondary" style="flex:1;">Clear Highlights</button>
+  </div>
+
+  <div id="norm"></div>
+  <div id="error"></div>
+  <div id="status"></div>
+
+  <div class="legend">
+    <div class="leg-item"><span class="swatch" style="background:#FFE58A;"></span> Found by both Ctrl+F (Plain) &amp; Affix-Aware</div>
+    <div class="leg-item"><span class="swatch" style="background:#8FE3A0;"></span> Found ONLY by Affix-Aware (Improvement)</div>
+    <div class="leg-item"><span class="swatch" style="background:#F4A3A3;"></span> Found ONLY by Plain matching</div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

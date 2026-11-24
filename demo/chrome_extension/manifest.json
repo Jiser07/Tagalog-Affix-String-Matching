@@ -1,0 +1,11 @@
+{
+  "manifest_version": 3,
+  "name": "Tagalog Affix-Aware Search",
+  "version": "1.0",
+  "description": "Affix-aware Ctrl+F on live Tagalog websites powered by your Python engine.",
+  "permissions": ["activeTab", "scripting"],
+  "host_permissions": ["http://127.0.0.1/*"],
+  "action": {
+    "default_popup": "popup.html"
+  }
+}
